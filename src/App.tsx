@@ -1,136 +1,124 @@
 import React from 'react';
+import { QueryClient, QueryClientProvider, InfiniteData } from '@tanstack/react-query'; 
+import { GalleryGrid } from './components/GalleryGrid';
+import { Lightbox } from './components/Lightbox';
+import { SasExpiredBanner } from './components/SasExpiredBanner'; 
+import { useImageList } from './hooks/useImageList';
+import type { ImageItem } from './types';
+import type { GalleryResponse } from './services/azureGalleryService'; 
+import './style.css'; 
 
-function DebugApp() {
-  console.log('🔍 DEBUG: App component rendered');
-  
-  // Check environment variables
-  const accountUrl = import.meta.env.VITE_AZURE_ACCOUNT_URL;
-  const container = import.meta.env.VITE_AZURE_CONTAINER;
-  const sasToken = import.meta.env.VITE_AZURE_SAS;
-  
-  console.log('🔍 Environment variables:', {
-    accountUrl,
-    container,
-    sasToken: sasToken ? 'Set ✅' : 'Missing ❌',
-    prefix: import.meta.env.VITE_BLOB_PREFIX
-  });
+const queryClient = new QueryClient();
 
-  if (!accountUrl || !container || !sasToken) {
+function App() {
+  const [selectedImage, setSelectedImage] = React.useState<ImageItem | null>(null);
+  const [selectedIndex, setSelectedIndex] = React.useState<number>(0);
+
+  const prefix = import.meta.env.VITE_BLOB_PREFIX || undefined;
+
+  const { 
+    data,
+    fetchNextPage, 
+    hasNextPage, 
+    isFetchingNextPage, 
+    isLoading, 
+    isError, 
+    error 
+  } = useImageList(prefix); // Removed explicit type annotation here
+
+  const images: ImageItem[] = React.useMemo(() => {
+    return data?.pages?.flatMap((page: GalleryResponse) => page.images) || [];
+  }, [data]);
+
+  const handleImageClick = (image: ImageItem, index: number) => {
+    setSelectedImage(image);
+    setSelectedIndex(index);
+  };
+
+  const handleCloseLightbox = () => {
+    setSelectedImage(null);
+  };
+
+  const handleNextImage = () => {
+    if (selectedImage) {
+      const nextIndex = (selectedIndex + 1) % images.length;
+      setSelectedImage(images[nextIndex]);
+      setSelectedIndex(nextIndex);
+    }
+  };
+
+  const handlePrevImage = () => {
+    if (selectedImage) {
+      const prevIndex = (selectedIndex - 1 + images.length) % images.length;
+      setSelectedImage(images[prevIndex]);
+      setSelectedIndex(prevIndex);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p className="ml-4 text-lg text-gray-700">Loading gallery...</p>
+      </div>
+    );
+  }
+
+  if (isError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-red-50">
         <div className="text-center p-8 bg-white rounded-lg shadow-lg max-w-md">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">❌ Configuration Missing</h1>
-          <div className="text-left space-y-2 text-sm">
-            <p>Account URL: {accountUrl ? '✅ Set' : '❌ Missing'}</p>
-            <p>Container: {container ? '✅ Set' : '❌ Missing'}</p>
-            <p>SAS Token: {sasToken ? '✅ Set' : '❌ Missing'}</p>
-          </div>
-          <div className="mt-4 p-4 bg-gray-100 rounded text-xs text-left">
-            <p className="font-bold mb-2">Create .env file in root directory:</p>
-            <pre>{`VITE_AZURE_ACCOUNT_URL=https://youraccount.blob.core.windows.net
-VITE_AZURE_CONTAINER=images
-VITE_AZURE_SAS=?sv=...your-sas-token...`}</pre>
-          </div>
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Error Loading Gallery</h1>
+          <p className="text-gray-700">{error?.message || 'An unknown error occurred.'}</p>
+          {error?.message.includes('Failed to fetch images') && (
+            <p className="text-sm text-gray-500 mt-2">Please check if your backend server is running and configured correctly.</p>
+          )}
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-green-50">
-      <div className="text-center p-8 bg-white rounded-lg shadow-lg">
-        <h1 className="text-2xl font-bold text-green-600 mb-4">✅ Configuration OK!</h1>
-        <p className="mb-4">Environment variables are set. Testing Azure connection...</p>
-        <TestConnection />
-      </div>
-    </div>
-  );
-}
-
-function TestConnection() {
-  const [status, setStatus] = React.useState('Testing...');
-  const [error, setError] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    async function testAzure() {
-      try {
-        console.log('🔍 Testing Azure connection...');
-        
-        const accountUrl = import.meta.env.VITE_AZURE_ACCOUNT_URL;
-        const container = import.meta.env.VITE_AZURE_CONTAINER;
-        const sasToken = import.meta.env.VITE_AZURE_SAS;
-        
-        console.log('🔍 Testing with:', { accountUrl, container, sasToken: sasToken?.substring(0, 20) + '...' });
-        
-        // Fix: Use proper Azure Blob Storage List API format
-        // Remove any double encoding and format correctly
-        const cleanSasToken = sasToken.startsWith('?') ? sasToken : `?${sasToken}`;
-        
-        // Correct Azure REST API format for listing blobs
-        const testUrl = `${accountUrl}/${container}${cleanSasToken}&restype=container&comp=list&maxresults=10`;
-        
-        console.log('🔍 Request URL (first 100 chars):', testUrl.substring(0, 100) + '...');
-        
-        const response = await fetch(testUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/xml',
-          }
-        });
-        
-        console.log('🔍 Azure response:', response.status, response.statusText);
-        
-        if (response.ok) {
-          const data = await response.text();
-          console.log('🔍 Response data (first 200 chars):', data.substring(0, 200));
-          setStatus('✅ Azure connection successful!');
-          setError(null);
-        } else {
-          const errorText = await response.text();
-          console.log('🔍 Error response:', errorText);
-          setStatus('❌ Connection failed');
-          setError(`HTTP ${response.status}: ${response.statusText}\n\n${errorText}`);
-        }
-      } catch (err) {
-        console.error('🔍 Connection error:', err);
-        setStatus('❌ Connection failed');
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      }
-    }
-
-    testAzure();
-  }, []);
-
-  return (
-    <div>
-      <p className="mb-4">{status}</p>
-      {error && (
-        <div className="mt-4 p-4 bg-red-100 rounded text-xs text-left max-w-md overflow-auto max-h-64">
-          <p className="font-bold text-red-800 mb-2">Error Details:</p>
-          <pre className="whitespace-pre-wrap text-red-700">{error}</pre>
-        </div>
-      )}
-      {status.includes('✅') && (
-        <button 
-          onClick={() => window.location.reload()}
-          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Load Full Gallery
-        </button>
-      )}
+    <div className="App bg-gray-100 min-h-screen"> 
+      {/* <SasExpiredBanner /> Temporarily commented out */}
+      <header className="bg-white shadow-sm p-4 flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-800">Azure Image Gallery</h1>
+      </header>
       
-      {/* Debug section */}
-      <div className="mt-6 p-4 bg-gray-100 rounded text-xs">
-        <p className="font-bold mb-2">🔧 Troubleshooting:</p>
-        <div className="space-y-1">
-          <p>1. Check your SAS token format in .env</p>
-          <p>2. SAS should start with ?sv= and include ss=b, srt=sco, sp=rl</p>
-          <p>3. Container name should match exactly (case-sensitive)</p>
-          <p>4. Account URL should end with .blob.core.windows.net</p>
-        </div>
-      </div>
+      <main className="container mx-auto p-4">
+        <GalleryGrid
+          images={images}
+          onImageClick={handleImageClick}
+          onLoadMore={fetchNextPage}
+          hasNextPage={hasNextPage}
+          isLoadingMore={isFetchingNextPage}
+        />
+      </main>
+
+      {selectedImage && (
+        <Lightbox
+          image={selectedImage} 
+          onClose={handleCloseLightbox}
+          onNext={handleNextImage}
+          onPrev={handlePrevImage}
+          hasPrev={selectedIndex > 0} 
+          hasNext={selectedIndex < images.length - 1} 
+        />
+      )}
     </div>
   );
 }
 
-export default DebugApp;
+export default function ProvidedApp() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  );
+}

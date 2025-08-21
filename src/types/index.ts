@@ -5,6 +5,7 @@ export interface ImageItem {
   size?: number;
   contentType?: string;
   lastModified?: string;
+  container?: string; // Added container property
 }
 
 export interface ListImagesResult {

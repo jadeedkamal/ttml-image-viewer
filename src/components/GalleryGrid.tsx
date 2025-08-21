@@ -123,18 +123,18 @@ export function GalleryGrid({
           if (!row) return null;
 
           return (
-            // GOOD - single style attribute with all properties
             <div
-            className="grid gap-4 p-4"
-            style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: `${virtualRow.size}px`,
-                transform: `translateY(${virtualRow.start}px)`,
-                gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
-            }}
+              key={virtualRow.key} // Added key prop here
+              className="grid gap-4 p-4"
+              style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                  gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+              }}
             >
               {row.map((image, colIndex) => {
                 const globalIndex = virtualRow.index * columnCount + colIndex;

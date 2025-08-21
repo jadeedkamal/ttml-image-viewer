@@ -1,4 +1,3 @@
-// src/services/azureGalleryService.ts
 import type { ImageItem } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -14,12 +13,17 @@ export const azureGalleryService = {
    * Fetch images with SAS URLs from your backend
    */
   async getImages(continuationToken?: string): Promise<GalleryResponse> {
-    const url = new URL(`${API_BASE_URL}/gallery/images`);
+    // Construct the URL string directly
+    let url = `${API_BASE_URL}/gallery/images`;
+    const params = new URLSearchParams();
     if (continuationToken) {
-      url.searchParams.set('continuationToken', continuationToken);
+      params.set('continuationToken', continuationToken);
+    }
+    if (params.toString()) {
+      url += `?${params.toString()}`;
     }
 
-    const response = await fetch(url.toString());
+    const response = await fetch(url);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch images: ${response.status} ${response.statusText}`);

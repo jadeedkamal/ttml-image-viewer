@@ -3,29 +3,27 @@ import { useKeyboard } from '../hooks/useKeyboard';
 import type { ImageItem } from '../types';
 
 interface LightboxProps {
-  images: ImageItem[];
-  currentIndex: number;
-  isOpen: boolean;
+  image: ImageItem; 
   onClose: () => void;
   onNext: () => void;
   onPrev: () => void;
+  hasPrev: boolean; 
+  hasNext: boolean; 
 }
 
 export function Lightbox({
-  images,
-  currentIndex,
-  isOpen,
+  image,
   onClose,
   onNext,
-  onPrev
+  onPrev,
+  hasPrev,
+  hasNext
 }: LightboxProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-
-  const currentImage = images[currentIndex];
 
   useKeyboard({
     Escape: onClose,
@@ -34,7 +32,8 @@ export function Lightbox({
   }, [onClose, onNext, onPrev]);
 
   useEffect(() => {
-    if (isOpen) {
+    // Reset zoom and pan when image changes or lightbox opens
+    if (image) { // Removed '|| isOpen'
       document.body.style.overflow = 'hidden';
       setIsLoading(true);
       setZoom(1);
@@ -46,7 +45,7 @@ export function Lightbox({
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen, currentIndex]);
+  }, [image]); // Dependency on image to reset
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
@@ -75,8 +74,8 @@ export function Lightbox({
   };
 
   const handleDownload = () => {
-    if (currentImage) {
-      window.open(currentImage.url, '_blank');
+    if (image) {
+      window.open(image.url, '_blank');
     }
   };
 
@@ -87,9 +86,9 @@ export function Lightbox({
     return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
-  if (!isOpen || !currentImage) return null;
+  if (!image) return null; // Only render if image is provided
 
-  const fileName = currentImage.name.split('/').pop() || currentImage.name;
+  const fileName = image.name.split('/').pop() || image.name;
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center">
@@ -99,8 +98,8 @@ export function Lightbox({
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-medium truncate">{fileName}</h2>
             <p className="text-sm text-gray-300">
-              {currentIndex + 1} of {images.length}
-              {currentImage.size && ` • ${formatFileSize(currentImage.size)}`}
+              {/* Current index and total images are not directly available here anymore */}
+              {image.size && ` • ${formatFileSize(image.size)}`}
             </p>
           </div>
           <div className="flex items-center space-x-2 ml-4">
@@ -129,7 +128,7 @@ export function Lightbox({
       {/* Navigation */}
       <button
         onClick={onPrev}
-        disabled={currentIndex === 0}
+        disabled={!hasPrev}
         className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black/70 disabled:opacity-50 disabled:cursor-not-allowed rounded-full transition-colors z-10"
       >
         <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -139,7 +138,7 @@ export function Lightbox({
 
       <button
         onClick={onNext}
-        disabled={currentIndex === images.length - 1}
+        disabled={!hasNext}
         className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black/70 disabled:opacity-50 disabled:cursor-not-allowed rounded-full transition-colors z-10"
       >
         <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -160,7 +159,7 @@ export function Lightbox({
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
         )}
         <img
-          src={currentImage.url}
+          src={image.url}
           alt={fileName}
           className={`max-w-full max-h-full object-contain transition-opacity ${
             isLoading ? 'opacity-0' : 'opacity-100'

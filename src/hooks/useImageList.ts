@@ -1,17 +1,16 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
-import { listImages } from '../lib/azure';
-import type { ListImagesResult } from '../types';
+import { useInfiniteQuery, InfiniteData } from '@tanstack/react-query'; // Import InfiniteData
+import { azureGalleryService } from '../services/azureGalleryService'; 
+import type { GalleryResponse } from '../services/azureGalleryService'; 
 
 export function useImageList(prefix?: string) {
-  return useInfiniteQuery({
+  return useInfiniteQuery<GalleryResponse, Error, InfiniteData<GalleryResponse>, ['images', string | undefined], string | undefined>({
     queryKey: ['images', prefix],
-    queryFn: ({ pageParam }) => listImages(prefix, pageParam),
+    queryFn: ({ pageParam }) => azureGalleryService.getImages(pageParam),
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage: ListImagesResult) => lastPage.nextToken,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    getNextPageParam: (lastPage) => lastPage.continuationToken, 
+    staleTime: 5 * 60 * 1000, 
+    gcTime: 10 * 60 * 1000, 
     retry: (failureCount, error: any) => {
-      // Don't retry on 403 (SAS expired)
       if (error?.status === 403) return false;
       return failureCount < 3;
     }
@@ -19,7 +18,5 @@ export function useImageList(prefix?: string) {
 }
 
 export function usePrefetch(nextPageKey?: string) {
-  // This could be implemented to warm the next page
-  // For now, we'll rely on React Query's built-in prefetching
   return null;
 }
